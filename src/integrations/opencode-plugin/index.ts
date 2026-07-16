@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SettingsDefaultsManager } from "../../shared/SettingsDefaultsManager.js";
+import { USER_SETTINGS_PATH } from "../../shared/paths.js";
 import { getProjectContext } from "../../utils/project-name.js";
 
 /**
@@ -128,14 +129,24 @@ interface BusEvent {
   };
 }
 
+// OpenCode is launched outside claude-mem's hook framework, so the
+// CLAUDE_MEM_* env vars the hooks inject are usually absent here. Resolve
+// host/port through settings.json (env still wins inside loadFromFile),
+// falling back to SettingsDefaultsManager's env/UID-derived defaults.
+const fileSettings = (() => {
+  try {
+    return SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH);
+  } catch {
+    return null;
+  }
+})();
+
 function resolveWorkerPort(): string {
-  // Canonical resolution: CLAUDE_MEM_WORKER_PORT env override, else the
-  // UID-derived default — identical to the rest of the codebase (#2406).
-  return SettingsDefaultsManager.get("CLAUDE_MEM_WORKER_PORT");
+  return fileSettings?.CLAUDE_MEM_WORKER_PORT ?? SettingsDefaultsManager.get("CLAUDE_MEM_WORKER_PORT");
 }
 
 function resolveWorkerHost(): string {
-  return SettingsDefaultsManager.get("CLAUDE_MEM_WORKER_HOST");
+  return fileSettings?.CLAUDE_MEM_WORKER_HOST ?? SettingsDefaultsManager.get("CLAUDE_MEM_WORKER_HOST");
 }
 
 const WORKER_BASE_URL = `http://${resolveWorkerHost()}:${resolveWorkerPort()}`;
